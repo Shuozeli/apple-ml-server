@@ -1,0 +1,10 @@
+target/
+__pycache__/
+*.pyc
+Cargo.lock
+*.swiftdoc
+*.swiftsourceinfo
+.build/
+.pkgs/
+cli/target/
+sdk/target/
