@@ -1,0 +1,38 @@
+name: AppleML
+options:
+  bundleIdPrefix: com.shuozeli
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "15.0"
+  generateEmptyDirectories: true
+
+packages:
+  Vapor:
+    url: https://github.com/vapor/vapor.git
+    from: "4.99.0"
+
+targets:
+  AppleML:
+    type: application
+    platform: macOS
+    sources:
+      - path: AppleML
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.shuozeli.AppleML
+        PRODUCT_NAME: AppleML
+        MARKETING_VERSION: "2.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        SWIFT_VERSION: "5.9"
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        INFOPLIST_FILE: AppleML/Info.plist
+        CODE_SIGN_ENTITLEMENTS: AppleML/AppleML.entitlements
+        ENABLE_HARDENED_RUNTIME: true
+    dependencies:
+      - package: Vapor
+    entitlements:
+      path: AppleML/AppleML.entitlements
+      properties:
+        com.apple.security.network.server: true
+        com.apple.security.network.client: true
+        com.apple.security.files.user-selected.read-only: true

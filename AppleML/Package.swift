@@ -1,8 +1,9 @@
 // swift-tools-version:5.9
+// This Package.swift is for CLI validation only. Use the .xcodeproj for the full app.
 import PackageDescription
 
 let package = Package(
-    name: "apple-ml-vapor",
+    name: "AppleML",
     platforms: [
         .macOS(.v14)
     ],
@@ -11,19 +12,11 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "apple-ml-vapor",
+            name: "AppleML",
             dependencies: [
                 .product(name: "Vapor", package: "vapor"),
             ],
-            path: "Sources",
-            linkerSettings: [
-                .unsafeFlags([
-                    "-Xlinker", "-sectcreate",
-                    "-Xlinker", "__TEXT",
-                    "-Xlinker", "__info_plist",
-                    "-Xlinker", "Info.plist",
-                ]),
-            ]
+            path: "AppleML"
         ),
     ]
 )

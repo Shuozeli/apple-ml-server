@@ -1,12 +1,33 @@
-import Vapor
 import Foundation
+import Vapor
 
-// MARK: - OCR
+// Request/Response types - conform to both Codable and Vapor's Content
+struct TranscribeRequest: Content {
+    let audio: String
+    let format: String?
+    let language: String?
+    let timestamps: Bool?
+    let timeout: Int?
+}
+
+struct TranscribeResponse: Content {
+    let transcript: String
+    let confidence: Float
+    let language: String
+    let words: [WordTiming]?
+    let processingTimeMs: Int64
+    let error: String?
+
+    struct WordTiming: Content {
+        let word: String
+        let confidence: Float
+        let startMs: Int64
+        let endMs: Int64
+    }
+}
 
 struct OCRRequest: Content {
-    /// Base64-encoded image data
     let image: String
-    /// BCP-47 language code (optional, e.g., "en-US", "zh-CN")
     let language: String?
 }
 
@@ -30,39 +51,6 @@ struct OCRResponse: Content {
         let yMax: Float
     }
 }
-
-// MARK: - Transcribe
-
-struct TranscribeRequest: Content {
-    /// Base64-encoded audio data
-    let audio: String
-    /// Audio format: "wav", "mp3", "m4a", "flac"
-    let format: String?
-    /// BCP-47 language code (optional, e.g., "en-US", "zh-CN")
-    let language: String?
-    /// Include word-level timestamps
-    let timestamps: Bool?
-    /// Timeout in seconds (default: 300)
-    let timeout: Int?
-}
-
-struct TranscribeResponse: Content {
-    let transcript: String
-    let confidence: Float
-    let language: String
-    let words: [WordTiming]?
-    let processingTimeMs: Int64
-    let error: String?
-
-    struct WordTiming: Content {
-        let word: String
-        let confidence: Float
-        let startMs: Int64
-        let endMs: Int64
-    }
-}
-
-// MARK: - Errors
 
 enum MLError: Error, AbortError {
     case invalidInput(String)

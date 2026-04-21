@@ -3,15 +3,15 @@ import Foundation
 import AVFoundation
 
 actor TranscribeService {
-    static func transcribe(request: TranscribeRequest) async throws -> TranscribeResponse {
+    static let shared = TranscribeService()
+
+    func transcribe(request: TranscribeRequest) async throws -> TranscribeResponse {
         let startTime = Date()
 
-        // Decode base64 audio
         guard let audioData = Data(base64Encoded: request.audio) else {
             throw MLError.invalidInput("Invalid base64 audio data")
         }
 
-        // Check authorization
         let authStatus = SFSpeechRecognizer.authorizationStatus()
         if authStatus == .notDetermined {
             let granted = await requestAuthorization()
@@ -22,10 +22,8 @@ actor TranscribeService {
             throw MLError.notAuthorized
         }
 
-        // Determine format
         let format = request.format?.lowercased() ?? "m4a"
 
-        // Write to temp file
         let tempURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString + "." + format)
         try audioData.write(to: tempURL)
@@ -36,11 +34,9 @@ actor TranscribeService {
         if let requestLang = request.language, !requestLang.isEmpty {
             lang = requestLang
         } else {
-            print("No language specified, detecting...")
             lang = await LanguageDetector.detect(audioURL: tempURL)
         }
 
-        // Use the persistent speech worker
         let timeoutSeconds = TimeInterval(request.timeout ?? 300)
         let result = try await SpeechWorker.shared.transcribe(
             audioURL: tempURL,
@@ -52,16 +48,54 @@ actor TranscribeService {
         let processingTime = Int64(Date().timeIntervalSince(startTime) * 1000)
 
         return TranscribeResponse(
-            transcript: result.0,
-            confidence: result.1,
+            transcript: result.transcript,
+            confidence: result.confidence,
             language: lang,
-            words: result.2,
+            words: result.words,
             processingTimeMs: processingTime,
             error: nil
         )
     }
 
-    private static func requestAuthorization() async -> Bool {
+    /// Transcribe from a local file URL (used by GUI path).
+    func transcribeFile(url: URL, language: String?, timestamps: Bool) async throws -> TranscribeResponse {
+        let startTime = Date()
+
+        let authStatus = SFSpeechRecognizer.authorizationStatus()
+        if authStatus == .notDetermined {
+            let granted = await requestAuthorization()
+            if !granted { throw MLError.notAuthorized }
+        } else if authStatus != .authorized {
+            throw MLError.notAuthorized
+        }
+
+        let lang: String
+        if let requestLang = language, !requestLang.isEmpty {
+            lang = requestLang
+        } else {
+            lang = await LanguageDetector.detect(audioURL: url)
+        }
+
+        let result = try await SpeechWorker.shared.transcribe(
+            audioURL: url,
+            language: lang,
+            includeTimestamps: timestamps,
+            timeout: 300
+        )
+
+        let processingTime = Int64(Date().timeIntervalSince(startTime) * 1000)
+
+        return TranscribeResponse(
+            transcript: result.transcript,
+            confidence: result.confidence,
+            language: lang,
+            words: result.words,
+            processingTimeMs: processingTime,
+            error: nil
+        )
+    }
+
+    private func requestAuthorization() async -> Bool {
         await withCheckedContinuation { continuation in
             SFSpeechRecognizer.requestAuthorization { status in
                 continuation.resume(returning: status == .authorized)

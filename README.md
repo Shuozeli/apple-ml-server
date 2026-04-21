@@ -1,35 +1,58 @@
-# Apple ML Server
+# AppleML
 
-On-device speech-to-text and OCR REST API server using Apple's Vision and Speech frameworks. All inference runs locally on Apple Silicon with Neural Engine acceleration.
+On-device speech-to-text and OCR as a native macOS app. Uses Apple's Speech and Vision frameworks with Neural Engine acceleration. All processing runs locally -- no cloud dependencies.
+
+Follows the Ollama pattern: one app, two ways to run it.
 
 ## Features
 
 - **Speech-to-Text**: Transcription via `SFSpeechRecognizer` with word-level timestamps
 - **OCR**: Text recognition via `VNRecognizeTextRequest` with bounding boxes
-- **On-Device**: No cloud dependencies, all processing on Apple Neural Engine
-- **REST API**: Simple JSON API with OpenAPI 3.0 spec
-- **Multi-language**: Supports multiple languages (en-US, zh-CN, etc.)
+- **Automatic Language Detection**: Detects language from audio when not specified
+- **On-Device**: All processing on Apple Neural Engine, no data leaves your machine
+- **REST API**: JSON API with OpenAPI 3.0 spec, backward-compatible with CLI/SDK
+- **GUI**: Drag-drop file upload, history browser, settings
+- **Menu Bar**: Always-visible server status indicator
 
 ## Requirements
 
 - macOS 14+ (Sonoma)
 - Apple Silicon (M1/M2/M3/M4)
-- Swift 5.9+
-- Rust 1.75+ (for CLI)
+- Xcode 15+ (to build)
+- Rust 1.75+ (for CLI client, optional)
 
 ## Quick Start
 
+### Run as app (GUI + server)
+
 ```bash
-# Build server and CLI
-make release
+open AppleML.app
+```
 
-# Run the server
-make run-release
+Menu bar icon appears, API server starts on port 8080, GUI window available for file uploads and history.
 
-# Test with CLI
-./cli/target/release/apple-ml health
-./cli/target/release/apple-ml transcribe -f audio.m4a -l zh-CN
-./cli/target/release/apple-ml ocr -f image.png
+### Run as headless server (like `ollama serve`)
+
+```bash
+./AppleML.app/Contents/MacOS/AppleML --serve
+```
+
+Server starts on port 8080 with no GUI. Ideal for remote machines or automation.
+
+### Use the CLI client
+
+```bash
+# Health check
+apple-ml health
+
+# Transcribe (language auto-detected)
+apple-ml transcribe -f audio.mp3
+
+# Transcribe with explicit language
+apple-ml transcribe -f audio.m4a -l zh-CN --timestamps
+
+# OCR
+apple-ml ocr -f screenshot.png
 ```
 
 ## API Endpoints
@@ -42,90 +65,92 @@ make run-release
 | `/transcribe` | POST | Speech-to-text |
 | `/ocr` | POST | Image OCR |
 
-See [openapi.yaml](openapi.yaml) for full API documentation.
+See [docs/API.md](docs/API.md) for full API documentation.
 
-## CLI Usage
+## macOS Permissions
 
-```bash
-# Set server endpoint (default: localhost:8080)
-export APPLE_ML_ENDPOINT=http://mac-mini:8080
+As a native `.app` bundle, macOS handles permissions automatically:
 
-# Transcribe audio
-apple-ml transcribe -f audio.m4a -l zh-CN
+- **Speech Recognition**: Prompted automatically on app launch. Click **Allow** in the system dialog.
+- **Incoming Network**: Prompted on first remote connection.
+- **OCR**: No special permissions required.
 
-# With timestamps and JSON output
-apple-ml transcribe -f audio.m4a -l en-US --timestamps -o json
-
-# OCR an image
-apple-ml ocr -f screenshot.png
-
-# Health check
-apple-ml health
-```
+No manual TCC configuration or `tccutil` needed.
 
 ## Project Structure
 
 ```
 apple-ml-server/
-├── server/                 # Vapor REST API server
-│   ├── Package.swift
-│   └── Sources/
-│       ├── main.swift
-│       ├── Models.swift
-│       ├── OCRService.swift
-│       ├── TranscribeService.swift
-│       └── SpeechWorker.swift
-├── cli/                    # Rust CLI client
+├── AppleML/                     # Xcode project (macOS app)
+│   ├── AppleML.xcodeproj
+│   └── AppleML/
+│       ├── App/                 # SwiftUI entry, menu bar, lifecycle
+│       ├── Views/               # Transcribe, OCR, History, Settings
+│       ├── Server/              # Embedded Vapor server + routes
+│       ├── Core/                # ML services (shared by GUI and API)
+│       └── Storage/             # SwiftData history
+├── cli/                         # Rust CLI client
 │   ├── Cargo.toml
 │   └── src/main.rs
-├── openapi.yaml            # OpenAPI 3.0 spec
-├── Makefile
+├── sdk/                         # Rust SDK library
+│   ├── Cargo.toml
+│   └── src/
+├── docs/                        # Architecture & design docs
 └── README.md
 ```
 
-## Build Commands
+## Building
 
-| Command | Description |
-|---------|-------------|
-| `make build` | Build server + CLI (debug) |
-| `make release` | Build server + CLI (release) |
-| `make run` | Run server (debug) |
-| `make run-release` | Run server (release) |
-| `make stop` | Stop server |
-| `make clean` | Clean build artifacts |
-| `make install-cli` | Install CLI to /usr/local/bin |
-| `make test` | Test server endpoints |
+### App (Xcode)
+
+```bash
+# Open in Xcode
+open AppleML/AppleML.xcodeproj
+
+# Or build from command line
+xcodebuild -project AppleML/AppleML.xcodeproj -scheme AppleML -configuration Release build
+```
+
+### CLI (Rust)
+
+```bash
+cargo build --release
+# Binary at ./target/release/apple-ml
+```
 
 ## Configuration
 
-Environment variables:
+| Setting | Default | Description |
+|---------|---------|-------------|
+| Port | 8080 | API server port |
+| Bind address | 0.0.0.0 | Network interface to listen on |
+| Launch at login | Off | Start app automatically on login |
+| Default language | Auto-detect | Default transcription language |
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `HOST` | `0.0.0.0` | Server bind address |
-| `PORT` | `8080` | Server port |
-| `APPLE_ML_ENDPOINT` | `http://localhost:8080` | CLI server endpoint |
+Settings configurable via the GUI (Settings tab) or environment variables (`PORT`, `HOST`) in headless mode.
 
-## Example: Transcribe Audio
+## CLI Client
 
 ```bash
-# Using curl
+# Set endpoint (default: localhost:8080)
+export APPLE_ML_ENDPOINT=http://mac-mini:8080
+
+# Transcribe
+apple-ml transcribe -f audio.m4a -l zh-CN --timestamps -o json
+
+# OCR
+apple-ml ocr -f image.png -o json
+
+# Health
+apple-ml health
+```
+
+## Example: Transcribe with cURL
+
+```bash
 curl -X POST http://localhost:8080/transcribe \
   -H "Content-Type: application/json" \
-  -d "{\"audio\": \"$(base64 -i audio.m4a)\", \"language\": \"zh-CN\"}"
-
-# Using CLI
-apple-ml transcribe -f audio.m4a -l zh-CN --timestamps -o json
+  -d "{\"audio\": \"$(base64 -i audio.m4a)\", \"format\": \"m4a\"}"
 ```
 
-## Example: OCR Image
-
-```bash
-# Using curl
-curl -X POST http://localhost:8080/ocr \
-  -H "Content-Type: application/json" \
-  -d "{\"image\": \"$(base64 -i image.png)\"}"
-
-# Using CLI
-apple-ml ocr -f image.png -o json
-```
+Language is auto-detected when omitted.

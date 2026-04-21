@@ -8,3 +8,8 @@ Cargo.lock
 .pkgs/
 cli/target/
 sdk/target/
+build/
+AppleML/.build/
+AppleML/Package.resolved
+*.xcuserdata
+xcuserdata/
