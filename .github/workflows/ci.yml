@@ -60,11 +60,11 @@ jobs:
       - name: Build
         run: cargo build --workspace
 
-  swift-server:
+  swift-app:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build Swift server
+      - name: Build Swift app package
         run: swift build
-        working-directory: ./server
+        working-directory: ./AppleML
